@@ -1,0 +1,1401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Projector Picture Calibration Suite</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Phosphor Icons CDN -->
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #050507;
+      color: #e2e8f0;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    .font-mono-code {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Custom subtle scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f1117;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #272d3d;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #3b445c;
+    }
+
+    /* Smooth transitions for HUD visibility */
+    .hud-element {
+      transition: opacity 0.25s ease-in-out, transform 0.25s ease-in-out;
+    }
+    .hud-hidden {
+      opacity: 0 !important;
+      pointer-events: none !important;
+      transform: translateY(-8px);
+    }
+
+    /* High precision rendering for test canvases */
+    canvas {
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+  </style>
+</head>
+<body class="w-screen h-screen relative bg-black flex flex-col justify-between select-none">
+
+  <!-- TOP BAR / NAVIGATION HEADER (HUD) -->
+  <header id="topNav" class="hud-element absolute top-0 left-0 right-0 z-40 bg-zinc-950/90 backdrop-blur-md border-b border-zinc-800/80 px-4 py-2.5 flex items-center justify-between shadow-2xl">
+    <div class="flex items-center space-x-3">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-500 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-950/40">
+        <i class="ph-bold ph-projector text-lg"></i>
+      </div>
+      <div>
+        <h1 class="text-sm font-semibold tracking-wide text-zinc-100 flex items-center gap-2">
+          LIFELONG ROAR <span class="text-xs px-2 py-0.5 rounded bg-zinc-800 text-amber-400 font-mono-code font-normal">CALIBRATOR</span>
+        </h1>
+        <p class="text-[10px] text-zinc-400 font-medium">Display Tuning & Reference Patterns</p>
+      </div>
+    </div>
+
+    <!-- Pattern Switcher Badges / Tabs -->
+    <nav class="flex items-center gap-1 overflow-x-auto max-w-xl px-2 py-1 bg-zinc-900/90 rounded-xl border border-zinc-800/60" id="tabsContainer">
+      <!-- Generated via JS -->
+    </nav>
+
+    <!-- Right utility actions & RGB Range Selector -->
+    <div class="flex items-center space-x-2">
+      <!-- Range Toggle (Full sRGB 0-255 vs Limited RGB 16-235) -->
+      <div class="flex items-center bg-zinc-900 p-0.5 rounded-lg border border-zinc-700/80 text-[11px] font-mono-code">
+        <button id="rangeLimitedBtn" class="px-2 py-1 rounded-md transition font-medium text-zinc-400 hover:text-white" title="TV / Broadcast / Fire TV Stick standard (16-235)">
+          Limited (16-235)
+        </button>
+        <button id="rangeFullBtn" class="px-2 py-1 rounded-md transition font-medium bg-indigo-600 text-white shadow" title="PC / Mac / Graphics card standard (0-255)">
+          Full (0-255)
+        </button>
+      </div>
+
+      <!-- Blink / Pulse Toggle for PLUGE & Highlights -->
+      <button id="pulseToggleBtn" class="px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium flex items-center gap-1.5 transition border border-zinc-700/60" title="Blink target bars to spot subtle steps in dark rooms (Hotkey: B)">
+        <i class="ph-bold ph-waveform text-emerald-400" id="pulseIcon"></i>
+        <span id="pulseLabel">Blink Off</span>
+      </button>
+
+      <button id="guideToggleBtn" class="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium flex items-center gap-1.5 transition border border-zinc-700/60 shadow-sm" title="Toggle calibration guidance (Hotkey: G)">
+        <i class="ph-bold ph-lightbulb-filament text-amber-400"></i>
+        <span>Guide</span>
+      </button>
+
+      <button id="hideHudBtn" class="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium flex items-center gap-1.5 transition border border-zinc-700/60 shadow-sm" title="Hide HUD for clean view (Hotkey: H)">
+        <i class="ph-bold ph-eye-slash"></i>
+        <span>Hide HUD</span>
+      </button>
+
+      <button id="fullscreenBtn" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center gap-1.5 transition shadow-lg shadow-indigo-900/30" title="Toggle Fullscreen (Hotkey: F)">
+        <i class="ph-bold ph-arrows-out-simple" id="fsIcon"></i>
+        <span id="fsText">Fullscreen</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN CANVAS STAGE (Full aspect presentation) -->
+  <main class="relative w-full h-full flex items-center justify-center bg-black overflow-hidden" id="stageContainer">
+    <canvas id="calibrationCanvas" class="block bg-black shadow-2xl"></canvas>
+  </main>
+
+  <!-- QUICK BOTTOM CONTROLS & STATUS DOCK (HUD) -->
+  <footer id="bottomBar" class="hud-element absolute bottom-3 left-1/2 -translate-x-1/2 z-40 bg-zinc-950/85 backdrop-blur-md border border-zinc-800/80 px-4 py-2 rounded-2xl flex items-center gap-5 shadow-2xl text-xs text-zinc-400">
+    <div class="flex items-center gap-2">
+      <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+      <span class="font-mono-code text-zinc-300" id="resolutionTag">1920 &times; 1080</span>
+      <span class="text-zinc-600">|</span>
+      <span id="activeRangeBadge" class="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-indigo-300 font-mono-code font-semibold">FULL (0-255)</span>
+      <span class="text-zinc-600">|</span>
+      <span id="aspectTag" class="text-zinc-300 font-mono-code">16:9 Map</span>
+    </div>
+
+    <div class="flex items-center gap-1 text-[11px] text-zinc-400">
+      <kbd class="px-1.5 py-0.5 bg-zinc-800 rounded border border-zinc-700 font-mono-code text-[10px] text-zinc-200">&larr;</kbd>
+      <kbd class="px-1.5 py-0.5 bg-zinc-800 rounded border border-zinc-700 font-mono-code text-[10px] text-zinc-200">&rarr;</kbd>
+      <span class="ml-1 mr-2">Patterns</span>
+
+      <kbd class="px-1.5 py-0.5 bg-zinc-800 rounded border border-zinc-700 font-mono-code text-[10px] text-zinc-200">R</kbd>
+      <span class="ml-1 mr-2">Toggle Range</span>
+
+      <kbd class="px-1.5 py-0.5 bg-zinc-800 rounded border border-zinc-700 font-mono-code text-[10px] text-zinc-200">B</kbd>
+      <span class="ml-1 mr-2">Blink</span>
+
+      <kbd class="px-1.5 py-0.5 bg-zinc-800 rounded border border-zinc-700 font-mono-code text-[10px] text-zinc-200">F</kbd>
+      <span class="ml-1 mr-2">Fullscreen</span>
+
+      <kbd class="px-1.5 py-0.5 bg-zinc-800 rounded border border-zinc-700 font-mono-code text-[10px] text-zinc-200">H</kbd>
+      <span class="ml-1 mr-2">HUD</span>
+
+      <kbd class="px-1.5 py-0.5 bg-zinc-800 rounded border border-zinc-700 font-mono-code text-[10px] text-zinc-200">G</kbd>
+      <span class="ml-1">Help</span>
+    </div>
+
+    <!-- Quick projector test toggle -->
+    <div class="flex items-center gap-2 border-l border-zinc-800 pl-4">
+      <button id="togglePatternSubmode" class="px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-[11px] transition flex items-center gap-1">
+        <i class="ph-bold ph-sliders"></i>
+        <span id="submodeBtnLabel">Mode Variation</span>
+      </button>
+    </div>
+  </footer>
+
+  <!-- FLOATING INTERACTIVE CALIBRATION ADVICE MODAL / SIDE PANEL -->
+  <aside id="guidePanel" class="hud-element absolute top-16 right-4 z-50 w-96 max-h-[82vh] overflow-y-auto bg-zinc-950/95 backdrop-blur-xl border border-zinc-800 rounded-2xl shadow-2xl p-5 text-sm transition-all duration-300">
+    <div class="flex items-center justify-between pb-3 border-b border-zinc-800/80 mb-4">
+      <div class="flex items-center gap-2">
+        <div class="p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400">
+          <i class="ph-fill ph-compass text-base"></i>
+        </div>
+        <div>
+          <h2 class="font-semibold text-zinc-100 text-sm" id="guideTitle">Calibration Instructions</h2>
+          <span class="text-[10px] text-zinc-400 font-mono-code" id="guideTargetSetting">TARGET: BRIGHTNESS</span>
+        </div>
+      </div>
+      <button id="closeGuideBtn" class="text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-zinc-800 transition">
+        <i class="ph-bold ph-x text-base"></i>
+      </button>
+    </div>
+
+    <!-- RGB Range Status Notice in Guide -->
+    <div id="guideRangeBanner" class="p-2.5 mb-3 rounded-xl border text-xs"></div>
+
+    <!-- Instructions content dynamic injected -->
+    <div id="guideBody" class="space-y-4 text-xs leading-relaxed text-zinc-300">
+      <!-- Steps loaded dynamically based on active pattern -->
+    </div>
+
+    <!-- Remote Quick Tip Box -->
+    <div class="mt-4 p-3 rounded-xl bg-zinc-900/90 border border-zinc-800 text-[11px] text-zinc-400">
+      <div class="flex items-center gap-2 font-semibold text-zinc-200 mb-1">
+        <i class="ph-fill ph-device-mobile-camera text-indigo-400"></i>
+        <span>Lifelong Roar Projector Remote Tip</span>
+      </div>
+      <p id="guideRemoteTip">
+        Press <b>Menu / Settings</b> on your Lifelong Roar remote, navigate to <b>Picture &gt; Picture Mode &gt; User</b> to unlock manual slider control.
+      </p>
+    </div>
+  </aside>
+
+  <!-- HUD RESTORE FLOATING BUTTON (Visible when HUD is hidden) -->
+  <div id="unhideHudNotice" class="absolute bottom-4 right-4 z-50 opacity-0 pointer-events-none transition duration-300 flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-900/90 border border-zinc-700/80 text-xs text-zinc-300 shadow-xl cursor-pointer">
+    <i class="ph-bold ph-eye text-amber-400"></i>
+    <span>Press <kbd class="font-mono-code font-bold text-white">H</kbd> or click to restore controls</span>
+  </div>
+
+  <script>
+    /**
+     * Lifelong Roar Projector Picture Calibration Engine
+     * Now supports both:
+     * - FULL RANGE sRGB (0-255): Reference black = 0, Reference white = 255 (PC / Mac / HDMI Graphics)
+     * - LIMITED RANGE RGB (16-235): Reference black = 16 (BTB 1-15), Reference white = 235 (WTW 236-254) (TV / Fire Stick / Blu-ray)
+     */
+
+    // Active Dynamic Range Setting: 'full' (0-255) | 'limited' (16-235)
+    let currentRgbRange = 'full';
+    let isPulseActive = false;
+    let pulsePhase = 0; // for blinking animation loop
+    let pulseAnimFrameId = null;
+
+    const PATTERNS = [
+      {
+        id: 'brightness',
+        name: 'Brightness (Black Level)',
+        icon: 'ph-moon',
+        setting: 'BRIGHTNESS (BLACK CLIPPING)',
+        remoteKey: 'Picture Menu → Brightness (Default: ~50)',
+        submodes: ['Standard PLUGE', 'Near-Black Steps'],
+        submodeIndex: 0,
+        guide: {
+          objective: 'Set the display black floor so dark shadows are distinct without milky washed-out blacks.',
+          stepsFull: [
+            '1. <b>Full Range (0-255) Active:</b> Baseline background is pure RGB 0.',
+            '2. Turn Brightness up until steps <b>RGB 1 through 8</b> appear clearly above the pure black floor.',
+            '3. Turn Brightness down gradually until RGB 0 is completely black, and <b>RGB 2 to 4</b> are barely discernible.',
+            '4. Toggle <b>Blink (Hotkey: B)</b> to verify the subtle shadow bars pulse without elevating the true black floor.'
+          ],
+          stepsLimited: [
+            '1. <b>Limited Range (16-235) Active:</b> Standard video black reference is <b>RGB 16</b>.',
+            '2. The Below-Black bars (BTB: <b>RGB 10, 12, 14</b>) and <b>RGB 16</b> must blend into the background.',
+            '3. Raise Brightness until RGB 16 turns grey, then lower it until RGB 16 merges seamlessly with the black canvas.',
+            '4. Verify that Above-Black bars (<b>RGB 17, 18, 19, 20</b>) remain visible and distinct.',
+            '5. If BTB (10-14) is clearly glowing grey, your source and projector have an HDMI range mismatch (Full source sent to Limited projector).'
+          ],
+          warning: 'Setting Brightness too low crushes dark coats, night skies, and hair into solid silhouettes (Black Crush). Too high produces a grey haze.'
+        }
+      },
+      {
+        id: 'contrast',
+        name: 'Contrast (White Level)',
+        icon: 'ph-sun',
+        setting: 'CONTRAST (WHITE CLIPPING)',
+        remoteKey: 'Picture Menu → Contrast (Default: ~50)',
+        submodes: ['Highlight Stairs', 'Checkerboard Highlights'],
+        submodeIndex: 0,
+        guide: {
+          objective: 'Maximize image dynamic range without blowing out specular highlights (clouds, snow, skin gloss).',
+          stepsFull: [
+            '1. <b>Full Range (0-255) Active:</b> Nominal peak white is <b>RGB 255</b>.',
+            '2. Increase Contrast until highlight boxes <b>240 to 254</b> vanish into the 255 field (white clipping).',
+            '3. Lower Contrast until steps <b>238 up to 252 or 254</b> are individually distinguishable from the 255 background.',
+            '4. Check that highlights do not tint pink or blue as LED backlight approaches max output.'
+          ],
+          stepsLimited: [
+            '1. <b>Limited Range (16-235) Active:</b> Standard video white reference is <b>RGB 235</b>.',
+            '2. Levels <b>236 to 254</b> represent "Whiter-Than-White" (WTW) headroom found in broadcast signals.',
+            '3. Adjust Contrast so that levels up to <b>234 and 235</b> are clearly defined.',
+            '4. For movies and video streaming, WTW (236-250) should ideally blend gently without harsh clipping.',
+            '5. Turn on <b>Blink (Hotkey: B)</b> to watch highlight steps oscillate and verify no premature blowout.'
+          ],
+          warning: 'Setting Contrast too high causes harsh image blooming, loss of facial highlights, and eye fatigue on LED/LCD budget projectors.'
+        }
+      },
+      {
+        id: 'sharpness',
+        name: 'Sharpness & Focus',
+        icon: 'ph-crosshair',
+        setting: 'SHARPNESS & OPTICAL FOCUS RING',
+        remoteKey: 'Projector Focus Ring + Picture Menu → Sharpness',
+        submodes: ['Line Pairs & Cross', 'Pixel Checkerboard (1:1)'],
+        submodeIndex: 0,
+        guide: {
+          objective: 'Eliminate false edge halos, ringing, and verify that optical keystone/lens focus is balanced from center to corners.',
+          stepsFull: [
+            '1. Physically adjust the manual focus wheel on the Lifelong Roar projector until the <b>center starburst and crosshairs</b> are razor-sharp.',
+            '2. Check the four corners of the screen: balance the focus so corner text is readable without throwing center focus out.',
+            '3. Now examine the horizontal and vertical lines in Picture Settings: lower <b>Sharpness down towards 0-25</b>.',
+            '4. If Sharpness is too high, you will see bright glowing white halos ("ringing") around black lines or buzzing moiré artifacts.',
+            '5. Leave Sharpness at the highest position that has <b>zero white ghost rings</b> around the black lines.'
+          ],
+          stepsLimited: [
+            '1. Use optical focus wheel first to focus screen center.',
+            '2. Check 4-corner targets for chromatic dispersion (red/blue edge fringing).',
+            '3. Lower projector Sharpness setting until false halos vanish along high-contrast transitions.'
+          ],
+          warning: 'Most digital projectors look best with digital sharpness set low (10-25). Over-sharpening artificially introduces harsh digital noise.'
+        }
+      },
+      {
+        id: 'color',
+        name: 'Color (Saturation)',
+        icon: 'ph-palette',
+        setting: 'COLOR / SATURATION',
+        remoteKey: 'Picture Menu → Color / Saturation (Default: ~50)',
+        submodes: ['SMPTE Color Bars', 'RGB Gradients'],
+        submodeIndex: 0,
+        guide: {
+          objective: 'Achieve vibrant, lifelike colors without chromatic clipping (oversaturation where bright colors turn into flat neon blobs).',
+          stepsFull: [
+            '1. SMPTE bars render at standard 75% reference luminance with saturation ladders inside each strip.',
+            '2. Increase <b>Color/Saturation</b>: watch the internal gradient wedges inside each color column.',
+            '3. If saturation is excessive, the steps inside the Red and Green bars will crush into one uniform flat neon rectangle.',
+            '4. Lower Color until each step in the gradient ladder remains distinct and the 75% reference bars look rich without buzzing.'
+          ],
+          stepsLimited: [
+            '1. Color bars reference standard Rec.709 video broadcast limits.',
+            '2. Observe the Yellow and Cyan transitions: ensure no color bleed or harsh edge clipping.',
+            '3. Adjust projector saturation until color bars look rich without smearing adjacent pixels.'
+          ],
+          warning: 'Cheap LED projectors often push blue/green hard. Keep saturation moderate so foliage and faces look natural rather than fluorescent.'
+        }
+      },
+      {
+        id: 'hue',
+        name: 'Hue & Skin Tone',
+        icon: 'ph-smiley',
+        setting: 'HUE / TINT & COLOR TEMPERATURE',
+        remoteKey: 'Picture Menu → Tint / Color Temp (Standard/Warm)',
+        submodes: ['Skin Tones & Tint', 'Color Balance Swatches'],
+        submodeIndex: 0,
+        guide: {
+          objective: 'Set natural flesh tones and neutralize overall color casts (magenta vs green / warm vs cool).',
+          stepsFull: [
+            '1. Observe the skin tone reference swatches in the center (Fitzpatrick I through VI representations).',
+            '2. If faces appear sickly green or jaundiced, rotate <b>Tint/Hue towards Red/Magenta</b>.',
+            '3. If faces appear sunburned or overly red/purplish, adjust <b>Tint/Hue towards Green</b>.',
+            '4. In Color Temperature settings, test <b>Warm</b> vs <b>Standard</b>. "Warm" often provides a cinematic D65 standard, whereas "Cool" adds an unnatural bluish tint.'
+          ],
+          stepsLimited: [
+            '1. Examine the natural memory color blocks: Foliage Green, Sky Blue, and Fitzpatrick Skin Swatches.',
+            '2. Adjust Hue/Tint so skin looks healthy and foliage doesn’t look neon or olive-yellow.'
+          ],
+          warning: 'The human eye is most sensitive to skin tones. Getting the skin patches right ensures movies and series look immediately realistic.'
+        }
+      },
+      {
+        id: 'geometry',
+        name: 'Geometry & Overscan',
+        icon: 'ph-frame-corners',
+        setting: 'KEYSTONE, 16:9 RATIO & OVERSCAN',
+        remoteKey: 'Keystone Wheel / Digital 4D Keystone + Aspect Ratio',
+        submodes: ['Full Grid & Circles', 'Edge Cropping & Borders'],
+        submodeIndex: 0,
+        guide: {
+          objective: 'Ensure the image has perfect 16:9 proportion, concentric circles are not squished, and no pixels are cropped off.',
+          stepsFull: [
+            '1. Make sure your Lifelong Roar projector Aspect Ratio setting is set to <b>16:9</b> or <b>Just Scan / Point-to-Point</b> (not Auto/Zoom/4:3).',
+            '2. Look at the outer red/white pixel border: the dashed border line must touch the exact edges of your projected screen canvas without being cropped.',
+            '3. Inspect the large center circle: if it resembles an oval or egg, your digital keystone or physical pitch tilt is stretching the image vertically or horizontally.',
+            '4. Align projector physically straight to the screen first before applying heavy digital keystone, as digital keystone reduces native resolution.'
+          ],
+          stepsLimited: [
+            '1. Confirm that edge 1px boundary lines are visible on all four sides.',
+            '2. If outer border is invisible, turn off HDMI Overscan in projector settings.'
+          ],
+          warning: 'Physical alignment is always superior to digital keystone. Digital correction causes soft spots and blur.'
+        }
+      },
+      {
+        id: 'grayscale',
+        name: 'Gamma & Grayscale',
+        icon: 'ph-chart-line-up',
+        setting: 'GAMMA & COLOR BALANCE',
+        remoteKey: 'Picture Menu → Gamma / Contrast fine-tune',
+        submodes: ['Step Staircase (16/32)', 'Smooth Continuous Ramp'],
+        submodeIndex: 0,
+        guide: {
+          objective: 'Inspect the smoothness of transitions between dark and light, checking for color banding or tint shifts.',
+          stepsFull: [
+            '1. <b>Full Range (0-255):</b> Staircase spans full 0 to 255 linear ramp.',
+            '2. Verify that each step has a clean progression without steps merging or skipping unevenly.',
+            '3. Look closely for unwanted color casts: does 50% gray look purely neutral, or is it tinted pinkish, greenish, or blueish?',
+            '4. Switch to <b>Continuous Ramp</b>: verify gradient rolls smoothly across width without harsh vertical bands.'
+          ],
+          stepsLimited: [
+            '1. <b>Limited Range (16-235):</b> Staircase strictly maps from 16 (Reference Black) to 235 (Nominal White).',
+            '2. Step 16 must match canvas background; step 235 must match white reference.',
+            '3. Banding indicates an HDMI RGB range mismatch between your player and projector.'
+          ],
+          warning: 'Heavy banding in the gradient usually indicates your media player is outputting limited range (16-235) while the projector expects full range (0-255) or vice versa.'
+        }
+      }
+    ];
+
+    // State
+    let currentPatternIndex = 0;
+    let isHudVisible = true;
+    let isGuideOpen = true;
+
+    // DOM Elements
+    const canvas = document.getElementById('calibrationCanvas');
+    const ctx = canvas.getContext('2d', { alpha: false });
+    const tabsContainer = document.getElementById('tabsContainer');
+    const stageContainer = document.getElementById('stageContainer');
+    const guidePanel = document.getElementById('guidePanel');
+    const guideTitle = document.getElementById('guideTitle');
+    const guideTargetSetting = document.getElementById('guideTargetSetting');
+    const guideBody = document.getElementById('guideBody');
+    const guideRemoteTip = document.getElementById('guideRemoteTip');
+    const guideRangeBanner = document.getElementById('guideRangeBanner');
+    const guideToggleBtn = document.getElementById('guideToggleBtn');
+    const closeGuideBtn = document.getElementById('closeGuideBtn');
+    const hideHudBtn = document.getElementById('hideHudBtn');
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    const fsIcon = document.getElementById('fsIcon');
+    const fsText = document.getElementById('fsText');
+    const togglePatternSubmode = document.getElementById('togglePatternSubmode');
+    const submodeBtnLabel = document.getElementById('submodeBtnLabel');
+    const resolutionTag = document.getElementById('resolutionTag');
+    const activeRangeBadge = document.getElementById('activeRangeBadge');
+    const unhideHudNotice = document.getElementById('unhideHudNotice');
+    const rangeLimitedBtn = document.getElementById('rangeLimitedBtn');
+    const rangeFullBtn = document.getElementById('rangeFullBtn');
+    const pulseToggleBtn = document.getElementById('pulseToggleBtn');
+    const pulseIcon = document.getElementById('pulseIcon');
+    const pulseLabel = document.getElementById('pulseLabel');
+
+    // Dynamic Range Selector Logic
+    function setRgbRange(range) {
+      currentRgbRange = range;
+      if (range === 'full') {
+        rangeFullBtn.className = 'px-2 py-1 rounded-md transition font-medium bg-indigo-600 text-white shadow';
+        rangeLimitedBtn.className = 'px-2 py-1 rounded-md transition font-medium text-zinc-400 hover:text-white';
+        activeRangeBadge.textContent = 'FULL sRGB (0-255)';
+        activeRangeBadge.className = 'px-2 py-0.5 rounded bg-indigo-950/60 border border-indigo-700/80 text-indigo-300 font-mono-code font-semibold';
+      } else {
+        rangeLimitedBtn.className = 'px-2 py-1 rounded-md transition font-medium bg-indigo-600 text-white shadow';
+        rangeFullBtn.className = 'px-2 py-1 rounded-md transition font-medium text-zinc-400 hover:text-white';
+        activeRangeBadge.textContent = 'LIMITED RGB (16-235)';
+        activeRangeBadge.className = 'px-2 py-0.5 rounded bg-amber-950/60 border border-amber-700/80 text-amber-300 font-mono-code font-semibold';
+      }
+      updateGuidePanel();
+      renderActivePattern();
+    }
+
+    rangeFullBtn.addEventListener('click', () => setRgbRange('full'));
+    rangeLimitedBtn.addEventListener('click', () => setRgbRange('limited'));
+
+    // Pulsing / Blinking loop to detect near-black / near-white bars in dark rooms
+    function togglePulse() {
+      isPulseActive = !isPulseActive;
+      if (isPulseActive) {
+        pulseLabel.textContent = 'Blink On';
+        pulseToggleBtn.classList.add('bg-emerald-950', 'border-emerald-600', 'text-emerald-300');
+        startPulseAnimation();
+      } else {
+        pulseLabel.textContent = 'Blink Off';
+        pulseToggleBtn.classList.remove('bg-emerald-950', 'border-emerald-600', 'text-emerald-300');
+        if (pulseAnimFrameId) cancelAnimationFrame(pulseAnimFrameId);
+        renderActivePattern();
+      }
+    }
+
+    pulseToggleBtn.addEventListener('click', togglePulse);
+
+    function startPulseAnimation() {
+      let lastTime = 0;
+      function animate(time) {
+        if (!isPulseActive) return;
+        // Blink cycle every 800ms
+        pulsePhase = Math.sin(time / 200);
+        renderActivePattern();
+        pulseAnimFrameId = requestAnimationFrame(animate);
+      }
+      pulseAnimFrameId = requestAnimationFrame(animate);
+    }
+
+    // Initialize Navigation Tabs
+    function initTabs() {
+      tabsContainer.innerHTML = '';
+      PATTERNS.forEach((p, idx) => {
+        const btn = document.createElement('button');
+        btn.className = `px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 whitespace-nowrap transition-all ${
+          idx === currentPatternIndex
+            ? 'bg-indigo-600 text-white shadow-md shadow-indigo-950/60'
+            : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/80'
+        }`;
+        btn.innerHTML = `<i class="ph-bold ${p.icon} text-sm"></i><span>${p.name.split(' ')[0]}</span>`;
+        btn.title = p.name;
+        btn.addEventListener('click', () => switchPattern(idx));
+        tabsContainer.appendChild(btn);
+      });
+    }
+
+    // Switch Pattern
+    function switchPattern(index) {
+      if (index < 0) index = PATTERNS.length - 1;
+      if (index >= PATTERNS.length) index = 0;
+      currentPatternIndex = index;
+
+      initTabs();
+      updateGuidePanel();
+      renderActivePattern();
+    }
+
+    // Update Guide Details
+    function updateGuidePanel() {
+      const p = PATTERNS[currentPatternIndex];
+      guideTitle.textContent = p.name;
+      guideTargetSetting.textContent = `TARGET: ${p.setting}`;
+      guideRemoteTip.innerHTML = `On Lifelong Roar remote: <b>${p.remoteKey}</b>`;
+      submodeBtnLabel.textContent = p.submodes[p.submodeIndex] || 'Toggle Variation';
+
+      // Update Range Context Banner
+      if (currentRgbRange === 'full') {
+        guideRangeBanner.className = 'p-2.5 mb-3 rounded-xl border border-indigo-800/60 bg-indigo-950/40 text-indigo-200 text-xs';
+        guideRangeBanner.innerHTML = `
+          <div class="flex items-center gap-1.5 font-semibold text-indigo-300 mb-1">
+            <i class="ph-bold ph-monitor"></i>
+            <span>Full Range sRGB (0-255) Active</span>
+          </div>
+          <p class="text-[11px] text-zinc-300 leading-normal">
+            PC / Mac / HDMI 0-255 mode. Reference black is <b>RGB 0</b>. Peak white is <b>RGB 255</b>.
+          </p>
+        `;
+      } else {
+        guideRangeBanner.className = 'p-2.5 mb-3 rounded-xl border border-amber-800/60 bg-amber-950/40 text-amber-200 text-xs';
+        guideRangeBanner.innerHTML = `
+          <div class="flex items-center gap-1.5 font-semibold text-amber-300 mb-1">
+            <i class="ph-bold ph-television"></i>
+            <span>Limited Range RGB (16-235) Active</span>
+          </div>
+          <p class="text-[11px] text-zinc-300 leading-normal">
+            Broadcast / Fire TV / Media Player standard. Reference black is <b>RGB 16</b> (1-15 are BTB). Reference white is <b>RGB 235</b> (236-254 are WTW headroom).
+          </p>
+        `;
+      }
+
+      const activeSteps = (currentRgbRange === 'full') ? p.guide.stepsFull : p.guide.stepsLimited;
+
+      let stepsHtml = `
+        <div class="p-2.5 bg-zinc-900/80 rounded-xl border border-zinc-800">
+          <p class="text-zinc-300 font-medium">${p.guide.objective}</p>
+        </div>
+        <div class="space-y-2 mt-2">
+      `;
+
+      activeSteps.forEach(step => {
+        stepsHtml += `<div class="p-2 rounded-lg bg-zinc-900/40 border border-zinc-800/50 text-zinc-300">${step}</div>`;
+      });
+
+      stepsHtml += `</div>
+        <div class="p-2.5 bg-amber-950/30 border border-amber-800/40 rounded-xl text-amber-300 text-[11px] flex gap-2 mt-3">
+          <i class="ph-fill ph-warning-circle text-amber-400 text-base shrink-0 mt-0.5"></i>
+          <div><strong class="font-semibold text-amber-200">Pitfall:</strong> ${p.guide.warning}</div>
+        </div>
+      `;
+
+      guideBody.innerHTML = stepsHtml;
+    }
+
+    // Resize Canvas to fit screen while maintaining crisp pixel mapping
+    function resizeCanvas() {
+      const dpr = window.devicePixelRatio || 1;
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+
+      canvas.width = Math.floor(w * dpr);
+      canvas.height = Math.floor(h * dpr);
+      canvas.style.width = `${w}px`;
+      canvas.style.height = `${h}px`;
+
+      ctx.resetTransform();
+      ctx.scale(dpr, dpr);
+
+      resolutionTag.innerHTML = `${w} &times; ${h} <span class="text-zinc-500 font-normal">(${Math.round(dpr * 100)}% DPI)</span>`;
+      renderActivePattern();
+    }
+
+    // ==========================================
+    // PATTERN DRAWING ROUTINES
+    // ==========================================
+
+    function renderActivePattern() {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const pattern = PATTERNS[currentPatternIndex];
+
+      // Clean background
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, w, h);
+
+      switch (pattern.id) {
+        case 'brightness':
+          drawBrightnessPattern(w, h, pattern.submodeIndex);
+          break;
+        case 'contrast':
+          drawContrastPattern(w, h, pattern.submodeIndex);
+          break;
+        case 'sharpness':
+          drawSharpnessPattern(w, h, pattern.submodeIndex);
+          break;
+        case 'color':
+          drawColorPattern(w, h, pattern.submodeIndex);
+          break;
+        case 'hue':
+          drawHuePattern(w, h, pattern.submodeIndex);
+          break;
+        case 'geometry':
+          drawGeometryPattern(w, h, pattern.submodeIndex);
+          break;
+        case 'grayscale':
+          drawGrayscalePattern(w, h, pattern.submodeIndex);
+          break;
+      }
+
+      // Draw Range & Mode Watermark Badge at Top
+      drawWatermark(w, h, pattern);
+    }
+
+    function drawWatermark(w, h, pattern) {
+      ctx.save();
+      ctx.font = '12px "JetBrains Mono", monospace';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+      ctx.textAlign = 'center';
+      const rangeText = (currentRgbRange === 'full') ? 'FULL sRGB [0-255]' : 'LIMITED RGB [16-235]';
+      ctx.fillText(`${pattern.name.toUpperCase()}  |  ${pattern.submodes[pattern.submodeIndex]}  |  ${rangeText}`, w / 2, 28);
+      ctx.restore();
+    }
+
+    // 1. BRIGHTNESS (PLUGE & Black Clipping) - FULL & LIMITED MODES
+    function drawBrightnessPattern(w, h, submode) {
+      const isLimited = (currentRgbRange === 'limited');
+      const bgVal = isLimited ? 16 : 0; // In Limited, reference black is 16; In full, 0
+
+      ctx.fillStyle = `rgb(${bgVal}, ${bgVal}, ${bgVal})`;
+      ctx.fillRect(0, 0, w, h);
+
+      if (submode === 0) {
+        // PLUGE Bars Pattern
+        let steps;
+        if (isLimited) {
+          // Limited 16-235 steps (Below Black: 10, 12, 14; Reference: 16; Above Black: 17, 18, 19, 20, 22, 24, 28, 34)
+          steps = [
+            { val: 10, label: '10 (BTB)' },
+            { val: 12, label: '12 (BTB)' },
+            { val: 14, label: '14 (BTB)' },
+            { val: 16, label: '16 (REF BLACK)' },
+            { val: 17, label: '17 (+0.4%)', target: true },
+            { val: 18, label: '18 (+0.8%)', target: true },
+            { val: 19, label: '19 (+1.2%)', target: true },
+            { val: 20, label: '20 (+1.6%)', target: true },
+            { val: 22, label: '22 (+2.4%)' },
+            { val: 24, label: '24 (+3.1%)' },
+            { val: 28, label: '28 (+4.7%)' },
+            { val: 34, label: '34 (+7.0%)' }
+          ];
+        } else {
+          // Full 0-255 steps
+          steps = [
+            { val: 0, label: '0 (REF BLACK)' },
+            { val: 1, label: '1 (+0.4%)', target: true },
+            { val: 2, label: '2 (+0.8%)', target: true },
+            { val: 3, label: '3 (+1.2%)', target: true },
+            { val: 4, label: '4 (+1.6%)', target: true },
+            { val: 6, label: '6 (+2.3%)' },
+            { val: 8, label: '8 (+3.1%)' },
+            { val: 12, label: '12 (+4.7%)' },
+            { val: 16, label: '16 (+6.2%)' },
+            { val: 20, label: '20 (+7.8%)' },
+            { val: 26, label: '26 (+10.2%)' },
+            { val: 36, label: '36 (+14.1%)' }
+          ];
+        }
+
+        const barWidth = Math.floor((w * 0.88) / steps.length);
+        const barHeight = Math.floor(h * 0.52);
+        const startY = Math.floor(h * 0.22);
+        let startX = (w - steps.length * barWidth) / 2;
+
+        steps.forEach((s) => {
+          let drawVal = s.val;
+          // Apply blinking if active on target threshold bars
+          if (isPulseActive && s.target) {
+            const delta = pulsePhase > 0 ? 5 : 0;
+            drawVal = Math.min(255, s.val + delta);
+          }
+
+          ctx.fillStyle = `rgb(${drawVal}, ${drawVal}, ${drawVal})`;
+          ctx.fillRect(startX, startY, barWidth - 4, barHeight);
+
+          // Labels
+          ctx.fillStyle = s.val > 28 ? '#000000' : '#888888';
+          ctx.font = '10px "JetBrains Mono", monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText(s.label, startX + barWidth / 2 - 2, startY + barHeight - 16);
+
+          startX += barWidth;
+        });
+
+        // Instructions banner
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '13px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        if (isLimited) {
+          ctx.fillText('LIMITED MODE (16-235): Background is RGB 16. Bars 10-14 (BTB) & 16 must MERGE into background. Steps 17+ must be visible.', w / 2, h - 50);
+        } else {
+          ctx.fillText('FULL MODE (0-255): Background is RGB 0. Bar 0 must MERGE into black canvas. Steps 1-4 must barely emerge from darkness.', w / 2, h - 50);
+        }
+      } else {
+        // Submode: Matrix of near-black tiles
+        const cols = 6;
+        const rows = 4;
+        const pad = 24;
+        const boxW = (w * 0.7 - (cols - 1) * pad) / cols;
+        const boxH = (h * 0.6 - (rows - 1) * pad) / rows;
+        const startX = w * 0.15;
+        const startY = h * 0.18;
+
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const index = r * cols + c;
+            const codeVal = isLimited ? (16 + index) : (index + 1);
+            const bx = startX + c * (boxW + pad);
+            const by = startY + r * (boxH + pad);
+
+            let renderVal = codeVal;
+            if (isPulseActive && index < 4) {
+              renderVal = pulsePhase > 0 ? (codeVal + 4) : codeVal;
+            }
+
+            ctx.fillStyle = `rgb(${renderVal}, ${renderVal}, ${renderVal})`;
+            ctx.fillRect(bx, by, boxW, boxH);
+
+            ctx.fillStyle = '#71717a';
+            ctx.font = '11px "JetBrains Mono", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(`RGB ${codeVal}`, bx + boxW / 2, by + boxH / 2 + 4);
+          }
+        }
+      }
+    }
+
+    // 2. CONTRAST (White Clipping Pattern) - FULL & LIMITED MODES
+    function drawContrastPattern(w, h, submode) {
+      const isLimited = (currentRgbRange === 'limited');
+
+      // Contrast field background
+      ctx.fillStyle = isLimited ? '#101010' : '#050507';
+      ctx.fillRect(0, 0, w, h);
+
+      if (submode === 0) {
+        let steps;
+        if (isLimited) {
+          // Limited 16-235 highlights: 235 is nominal white, 236-254 are WTW headroom
+          steps = [
+            { val: 220, label: '220' },
+            { val: 225, label: '225' },
+            { val: 230, label: '230' },
+            { val: 232, label: '232' },
+            { val: 234, label: '234', target: true },
+            { val: 235, label: '235 (REF WHITE)', ref: true },
+            { val: 238, label: '238 (WTW)', target: true },
+            { val: 242, label: '242 (WTW)' },
+            { val: 246, label: '246 (WTW)' },
+            { val: 250, label: '250 (WTW)' },
+            { val: 254, label: '254 (WTW)' }
+          ];
+        } else {
+          // Full 0-255 highlights
+          steps = [
+            { val: 230, label: '230' },
+            { val: 236, label: '236' },
+            { val: 240, label: '240' },
+            { val: 244, label: '244' },
+            { val: 248, label: '248' },
+            { val: 250, label: '250', target: true },
+            { val: 251, label: '251', target: true },
+            { val: 252, label: '252', target: true },
+            { val: 253, label: '253', target: true },
+            { val: 254, label: '254', target: true },
+            { val: 255, label: '255 (PEAK)', ref: true }
+          ];
+        }
+
+        const barWidth = Math.floor((w * 0.88) / steps.length);
+        const barHeight = Math.floor(h * 0.5);
+        const startX = (w - steps.length * barWidth) / 2;
+        const startY = (h - barHeight) / 2;
+
+        steps.forEach((s, idx) => {
+          const x = startX + idx * barWidth;
+          let drawVal = s.val;
+
+          if (isPulseActive && s.target) {
+            const delta = pulsePhase > 0 ? -6 : 0;
+            drawVal = Math.max(0, s.val + delta);
+          }
+
+          ctx.fillStyle = `rgb(${drawVal}, ${drawVal}, ${drawVal})`;
+          ctx.fillRect(x, startY, barWidth - 4, barHeight);
+
+          // Label
+          ctx.fillStyle = '#0f172a';
+          ctx.font = '10px "JetBrains Mono", monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText(s.label, x + barWidth / 2, startY + barHeight - 16);
+        });
+
+        // Top reference banner
+        ctx.fillStyle = isLimited ? 'rgb(235, 235, 235)' : 'rgb(255, 255, 255)';
+        ctx.fillRect(w * 0.06, startY - 35, w * 0.88, 14);
+
+        ctx.fillStyle = '#cbd5e1';
+        ctx.font = '13px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        if (isLimited) {
+          ctx.fillText('LIMITED MODE (16-235): RGB 235 is Nominal White. Steps 220-234 must be distinct. Headroom 236-250 may blend gently.', w / 2, h - 50);
+        } else {
+          ctx.fillText('FULL MODE (0-255): RGB 255 is Peak White. Adjust Contrast so steps up to 252 or 254 are not blown out into 255.', w / 2, h - 50);
+        }
+      } else {
+        // High contrast alternating bars & subtle grid
+        const bgVal = isLimited ? 235 : 255;
+        ctx.fillStyle = `rgb(${bgVal}, ${bgVal}, ${bgVal})`;
+        ctx.fillRect(0, 0, w, h);
+
+        const size = 60;
+        const cols = Math.ceil(w / size);
+        const rows = Math.ceil(h / size);
+
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            if ((r + c) % 2 === 0) {
+              const checkVal = isLimited ? 230 : 252;
+              ctx.fillStyle = `rgb(${checkVal}, ${checkVal}, ${checkVal})`;
+              ctx.fillRect(c * size, r * size, size, size);
+            }
+          }
+        }
+
+        // Center card
+        ctx.fillStyle = '#0a0a0c';
+        ctx.fillRect(w / 2 - 220, h / 2 - 100, 440, 200);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '15px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`Highlight Check: ${isLimited ? 'Limited (230 vs 235)' : 'Full (252 vs 255)'}`, w / 2, h / 2 - 20);
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '12px Inter, sans-serif';
+        ctx.fillText('The subtle background checkerboard must remain faintly visible.', w / 2, h / 2 + 10);
+      }
+    }
+
+    // 3. SHARPNESS & FOCUS (1px lines, starburst, focus crosshairs)
+    function drawSharpnessPattern(w, h, submode) {
+      ctx.fillStyle = '#808080'; // 50% gray reveals ringing best
+      ctx.fillRect(0, 0, w, h);
+
+      if (submode === 0) {
+        const cx = w / 2;
+        const cy = h / 2;
+
+        // Center Starburst
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 1;
+        const rays = 72;
+        const radius = Math.min(w, h) * 0.28;
+
+        for (let i = 0; i < rays; i++) {
+          const angle = (i * 2 * Math.PI) / rays;
+          ctx.beginPath();
+          ctx.moveTo(cx, cy);
+          ctx.lineTo(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius);
+          ctx.stroke();
+        }
+
+        // Concentric circles
+        for (let r = 20; r <= radius; r += 16) {
+          ctx.beginPath();
+          ctx.arc(cx, cy, r, 0, Math.PI * 2);
+          ctx.strokeStyle = r % 32 === 0 ? '#ffffff' : '#000000';
+          ctx.stroke();
+        }
+
+        // 4 Corner Focus Crosshairs
+        const cornerMargin = 90;
+        const cornerTargets = [
+          { x: cornerMargin, y: cornerMargin },
+          { x: w - cornerMargin, y: cornerMargin },
+          { x: cornerMargin, y: h - cornerMargin },
+          { x: w - cornerMargin, y: h - cornerMargin }
+        ];
+
+        cornerTargets.forEach((pos, i) => {
+          ctx.beginPath();
+          ctx.arc(pos.x, pos.y, 45, 0, Math.PI * 2);
+          ctx.fillStyle = '#1e293b';
+          ctx.fill();
+          ctx.strokeStyle = '#ffffff';
+          ctx.stroke();
+
+          for (let dy = -30; dy <= 30; dy += 6) {
+            ctx.beginPath();
+            ctx.moveTo(pos.x - 30, pos.y + dy);
+            ctx.lineTo(pos.x + 30, pos.y + dy);
+            ctx.strokeStyle = dy % 12 === 0 ? '#38bdf8' : '#ffffff';
+            ctx.stroke();
+          }
+
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '10px "JetBrains Mono", monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText(`CORNER ${i + 1}`, pos.x, pos.y + 60);
+        });
+
+        // Alternating 1px horizontal and vertical line blocks
+        const blockW = 120;
+        const blockH = 120;
+
+        const imgDataV = ctx.createImageData(blockW, blockH);
+        for (let y = 0; y < blockH; y++) {
+          for (let x = 0; x < blockW; x++) {
+            const idx = (y * blockW + x) * 4;
+            const val = (x % 2 === 0) ? 0 : 255;
+            imgDataV.data[idx] = val;
+            imgDataV.data[idx + 1] = val;
+            imgDataV.data[idx + 2] = val;
+            imgDataV.data[idx + 3] = 255;
+          }
+        }
+        ctx.putImageData(imgDataV, w * 0.15, h / 2 - blockH / 2);
+
+        const imgDataH = ctx.createImageData(blockW, blockH);
+        for (let y = 0; y < blockH; y++) {
+          for (let x = 0; x < blockW; x++) {
+            const idx = (y * blockW + x) * 4;
+            const val = (y % 2 === 0) ? 0 : 255;
+            imgDataH.data[idx] = val;
+            imgDataH.data[idx + 1] = val;
+            imgDataH.data[idx + 2] = val;
+            imgDataH.data[idx + 3] = 255;
+          }
+        }
+        ctx.putImageData(imgDataH, w * 0.85 - blockW, h / 2 - blockH / 2);
+
+        ctx.fillStyle = '#0f172a';
+        ctx.font = '13px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('CRITICAL: Dial back Sharpness until white halo outlines vanish around lines and starburst rays.', w / 2, h - 50);
+      } else {
+        // True 1:1 Single-Pixel Checkerboard grid
+        const checkerW = Math.min(w * 0.8, 800);
+        const checkerH = Math.min(h * 0.6, 500);
+        const startX = Math.floor((w - checkerW) / 2);
+        const startY = Math.floor((h - checkerH) / 2);
+
+        const imgData = ctx.createImageData(checkerW, checkerH);
+        for (let y = 0; y < checkerH; y++) {
+          for (let x = 0; x < checkerW; x++) {
+            const idx = (y * checkerW + x) * 4;
+            const color = ((x + y) % 2 === 0) ? 255 : 0;
+            imgData.data[idx] = color;
+            imgData.data[idx + 1] = color;
+            imgData.data[idx + 2] = color;
+            imgData.data[idx + 3] = 255;
+          }
+        }
+        ctx.putImageData(imgData, startX, startY);
+
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(startX, startY, checkerW, checkerH);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '13px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('1:1 Pixel Mapping Checkerboard. If you see swirling lines/moiré, turn off Projector Overscan/Aspect Zoom.', w / 2, startY - 20);
+      }
+    }
+
+    // 4. COLOR & SATURATION (SMPTE Bars & Color Ramps)
+    function drawColorPattern(w, h, submode) {
+      const isLimited = (currentRgbRange === 'limited');
+      // In Limited, 75% video bars scale across 16-235; in Full, across 0-255
+      const highVal = isLimited ? 180 : 191; // ~75% reference
+
+      if (submode === 0) {
+        const colors75 = [
+          { r: highVal, g: highVal, b: highVal, name: '75% Gray' },
+          { r: highVal, g: highVal, b: 0,       name: 'Yellow' },
+          { r: 0,       g: highVal, b: highVal, name: 'Cyan' },
+          { r: 0,       g: highVal, b: 0,       name: 'Green' },
+          { r: highVal, g: 0,       b: highVal, name: 'Magenta' },
+          { r: highVal, g: 0,       b: 0,       name: 'Red' },
+          { r: 0,       g: 0,       b: highVal, name: 'Blue' }
+        ];
+
+        const barW = w / colors75.length;
+        const mainH = h * 0.65;
+
+        // Top 75% Bars
+        colors75.forEach((c, idx) => {
+          ctx.fillStyle = `rgb(${c.r}, ${c.g}, ${c.b})`;
+          ctx.fillRect(idx * barW, 0, barW + 1, mainH);
+
+          // Internal Saturation Ramp
+          const rampH = mainH * 0.28;
+          const rampY = mainH - rampH;
+          const grad = ctx.createLinearGradient(idx * barW, rampY, (idx + 1) * barW, rampY);
+          grad.addColorStop(0, '#ffffff');
+          grad.addColorStop(0.5, `rgb(${c.r}, ${c.g}, ${c.b})`);
+          grad.addColorStop(1, '#000000');
+          ctx.fillStyle = grad;
+          ctx.fillRect(idx * barW, rampY, barW, rampH);
+
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '11px "JetBrains Mono", monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText(c.name, idx * barW + barW / 2, rampY - 12);
+        });
+
+        // Bottom reference blocks
+        const botH = h - mainH;
+        const botY = mainH;
+        const blackRef = isLimited ? 16 : 0;
+        const whiteRef = isLimited ? 235 : 255;
+        const bottomBlocks = [
+          { r: 0, g: highVal, b: highVal },
+          { r: highVal, g: 0, b: highVal },
+          { r: highVal, g: highVal, b: highVal },
+          { r: blackRef, g: blackRef, b: blackRef },
+          { r: whiteRef, g: whiteRef, b: whiteRef },
+          { r: 0, g: 0, b: 0 }
+        ];
+        const botW = w / bottomBlocks.length;
+        bottomBlocks.forEach((c, i) => {
+          ctx.fillStyle = `rgb(${c.r}, ${c.g}, ${c.b})`;
+          ctx.fillRect(i * botW, botY, botW + 1, botH);
+        });
+      } else {
+        // Continuous Color Ramps
+        const ramps = [
+          { name: 'Red Ramp', from: '#000000', to: '#ff0000' },
+          { name: 'Green Ramp', from: '#000000', to: '#00ff00' },
+          { name: 'Blue Ramp', from: '#000000', to: '#0000ff' },
+          { name: 'Yellow Ramp', from: '#000000', to: '#ffff00' },
+          { name: 'Cyan Ramp', from: '#000000', to: '#00ffff' },
+          { name: 'Magenta Ramp', from: '#000000', to: '#ff00ff' }
+        ];
+
+        const rampH = (h * 0.8) / ramps.length;
+        const startY = h * 0.1;
+        const rampW = w * 0.85;
+        const startX = (w - rampW) / 2;
+
+        ramps.forEach((r, idx) => {
+          const y = startY + idx * rampH;
+          const grad = ctx.createLinearGradient(startX, y, startX + rampW, y);
+          grad.addColorStop(0, r.from);
+          grad.addColorStop(1, r.to);
+
+          ctx.fillStyle = grad;
+          ctx.fillRect(startX, y, rampW, rampH - 10);
+
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '11px Inter, sans-serif';
+          ctx.textAlign = 'left';
+          ctx.fillText(r.name, startX + 10, y + rampH / 2);
+        });
+      }
+    }
+
+    // 5. HUE & SKIN TONE
+    function drawHuePattern(w, h, submode) {
+      ctx.fillStyle = '#131418';
+      ctx.fillRect(0, 0, w, h);
+
+      const skinTones = [
+        { label: 'Type I (Fair Pale)', color: '#f7d8c6' },
+        { label: 'Type II (Fair Peach)', color: '#f0c7a5' },
+        { label: 'Type III (Medium Warm)', color: '#d9a07a' },
+        { label: 'Type IV (Olive / Tan)', color: '#b87c53' },
+        { label: 'Type V (Brown)', color: '#885331' },
+        { label: 'Type VI (Deep Espresso)', color: '#442b1f' }
+      ];
+
+      const patchW = Math.min(130, w / 8);
+      const patchH = 180;
+      const totalW = skinTones.length * (patchW + 16);
+      let startX = (w - totalW) / 2;
+      const startY = h * 0.22;
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '16px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Reference Human Skin Tones', w / 2, startY - 30);
+      ctx.font = '12px Inter, sans-serif';
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillText('Ensure faces do not look unnaturally reddish-magenta (sunburned) or greenish-yellow (jaundiced)', w / 2, startY - 10);
+
+      skinTones.forEach((skin) => {
+        ctx.fillStyle = skin.color;
+        ctx.beginPath();
+        ctx.roundRect(startX, startY, patchW, patchH, 12);
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.beginPath();
+        ctx.arc(startX + patchW / 2, startY + 60, 30, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '10px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(skin.label, startX + patchW / 2, startY + patchH + 20);
+
+        startX += patchW + 16;
+      });
+
+      // Bottom Hue Spectrogram Bar
+      const hueBarW = w * 0.8;
+      const hueBarH = 34;
+      const hueBarX = (w - hueBarW) / 2;
+      const hueBarY = h * 0.68;
+
+      const hueGrad = ctx.createLinearGradient(hueBarX, hueBarY, hueBarX + hueBarW, hueBarY);
+      hueGrad.addColorStop(0, '#ff0000');
+      hueGrad.addColorStop(0.17, '#ffff00');
+      hueGrad.addColorStop(0.33, '#00ff00');
+      hueGrad.addColorStop(0.5, '#00ffff');
+      hueGrad.addColorStop(0.67, '#0000ff');
+      hueGrad.addColorStop(0.83, '#ff00ff');
+      hueGrad.addColorStop(1, '#ff0000');
+
+      ctx.fillStyle = hueGrad;
+      ctx.fillRect(hueBarX, hueBarY, hueBarW, hueBarH);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '12px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Continuous 360° Hue Spectrum (Red → Yellow → Green → Cyan → Blue → Magenta → Red)', w / 2, hueBarY + 55);
+    }
+
+    // 6. GEOMETRY, KEYSTONE & FRAMING
+    function drawGeometryPattern(w, h, submode) {
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, w, h);
+
+      // Outer Red Border Line
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(2, 2, w - 4, h - 4);
+
+      // Inner 5% safe boundary
+      ctx.strokeStyle = '#3b82f6';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([6, 6]);
+      ctx.strokeRect(w * 0.05, h * 0.05, w * 0.9, h * 0.9);
+      ctx.setLineDash([]);
+
+      // Corner Alignment Triangles
+      const arrowSize = 40;
+      ctx.fillStyle = '#eab308';
+
+      ctx.beginPath();
+      ctx.moveTo(0, 0); ctx.lineTo(arrowSize, 0); ctx.lineTo(0, arrowSize); ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(w, 0); ctx.lineTo(w - arrowSize, 0); ctx.lineTo(w, arrowSize); ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(0, h); ctx.lineTo(arrowSize, h); ctx.lineTo(0, h - arrowSize); ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(w, h); ctx.lineTo(w - arrowSize, h); ctx.lineTo(w, h - arrowSize); ctx.fill();
+
+      // Center Concentric Circles
+      const cx = w / 2;
+      const cy = h / 2;
+      const maxRadius = Math.min(w, h) * 0.42;
+
+      for (let r = 50; r <= maxRadius; r += 50) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.strokeStyle = r === 200 ? '#eab308' : '#ffffff';
+        ctx.lineWidth = r === 200 ? 2 : 1;
+        ctx.stroke();
+      }
+
+      // Center Crosshair
+      ctx.strokeStyle = '#22c55e';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(cx - 80, cy); ctx.lineTo(cx + 80, cy);
+      ctx.moveTo(cx, cy - 80); ctx.lineTo(cx, cy + 80);
+      ctx.stroke();
+
+      // Diagonal Lines
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+      ctx.beginPath();
+      ctx.moveTo(0, 0); ctx.lineTo(w, h);
+      ctx.moveTo(w, 0); ctx.lineTo(0, h);
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '13px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(`ASPECT RATIO 16:9 REFERENCE | OVERSCAN BORDER`, cx, cy + maxRadius + 30);
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '11px Inter, sans-serif';
+      ctx.fillText('Circle must be round. If oval, adjust physical projector tilt / keystone correction.', cx, cy + maxRadius + 50);
+    }
+
+    // 7. GRAYSCALE & GAMMA - FULL & LIMITED MODES
+    function drawGrayscalePattern(w, h, submode) {
+      const isLimited = (currentRgbRange === 'limited');
+      ctx.fillStyle = isLimited ? '#101010' : '#050507';
+      ctx.fillRect(0, 0, w, h);
+
+      if (submode === 0) {
+        // Discrete 16-step & 32-step Staircases
+        const steps = 16;
+        const barW = (w * 0.88) / steps;
+        const barH = h * 0.35;
+        const startX = (w - steps * barW) / 2;
+        const startY = h * 0.2;
+
+        const minVal = isLimited ? 16 : 0;
+        const maxVal = isLimited ? 235 : 255;
+
+        for (let i = 0; i < steps; i++) {
+          const val = Math.round(minVal + (i / (steps - 1)) * (maxVal - minVal));
+          const x = startX + i * barW;
+
+          ctx.fillStyle = `rgb(${val}, ${val}, ${val})`;
+          ctx.fillRect(x, startY, barW, barH);
+
+          ctx.fillStyle = val > 128 ? '#000000' : '#ffffff';
+          ctx.font = '10px "JetBrains Mono", monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText(`${val}`, x + barW / 2, startY + barH / 2);
+        }
+
+        // Bottom continuous ramp
+        const rampY = startY + barH + 40;
+        const rampH = 60;
+        const grad = ctx.createLinearGradient(startX, rampY, startX + steps * barW, rampY);
+        grad.addColorStop(0, `rgb(${minVal}, ${minVal}, ${minVal})`);
+        grad.addColorStop(1, `rgb(${maxVal}, ${maxVal}, ${maxVal})`);
+
+        ctx.fillStyle = grad;
+        ctx.fillRect(startX, rampY, steps * barW, rampH);
+
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '12px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${isLimited ? 'Limited (16-235)' : 'Full (0-255)'}: Upper: 16 Quantized Steps. Lower: Continuous Gradient. Verify smooth roll-off without vertical stripe banding.`, w / 2, rampY + rampH + 40);
+      } else {
+        // Fullscreen Continuous Linear Ramp
+        const minVal = isLimited ? 16 : 0;
+        const maxVal = isLimited ? 235 : 255;
+
+        const rampY = h * 0.25;
+        const rampH = h * 0.45;
+        const grad = ctx.createLinearGradient(w * 0.08, rampY, w * 0.92, rampY);
+        grad.addColorStop(0, `rgb(${minVal}, ${minVal}, ${minVal})`);
+        grad.addColorStop(1, `rgb(${maxVal}, ${maxVal}, ${maxVal})`);
+
+        ctx.fillStyle = grad;
+        ctx.fillRect(w * 0.08, rampY, w * 0.84, rampH);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '13px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`Continuous Linear Dynamic Ramp (${minVal} to ${maxVal})`, w / 2, rampY - 24);
+      }
+    }
+
+    // ==========================================
+    // UI & CONTROLS INTERACTION
+    // ==========================================
+
+    function toggleHud() {
+      isHudVisible = !isHudVisible;
+      const topNav = document.getElementById('topNav');
+      const bottomBar = document.getElementById('bottomBar');
+
+      if (isHudVisible) {
+        topNav.classList.remove('hud-hidden');
+        bottomBar.classList.remove('hud-hidden');
+        if (isGuideOpen) guidePanel.classList.remove('hud-hidden');
+        unhideHudNotice.classList.add('opacity-0', 'pointer-events-none');
+      } else {
+        topNav.classList.add('hud-hidden');
+        bottomBar.classList.add('hud-hidden');
+        guidePanel.classList.add('hud-hidden');
+        unhideHudNotice.classList.remove('opacity-0', 'pointer-events-none');
+      }
+    }
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().then(() => {
+          fsIcon.className = 'ph-bold ph-arrows-in-simple';
+          fsText.textContent = 'Exit FS';
+        }).catch(err => {
+          console.error(`Fullscreen request failed: ${err.message}`);
+        });
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen().then(() => {
+            fsIcon.className = 'ph-bold ph-arrows-out-simple';
+            fsText.textContent = 'Fullscreen';
+          });
+        }
+      }
+    }
+
+    togglePatternSubmode.addEventListener('click', () => {
+      const p = PATTERNS[currentPatternIndex];
+      p.submodeIndex = (p.submodeIndex + 1) % p.submodes.length;
+      submodeBtnLabel.textContent = p.submodes[p.submodeIndex];
+      renderActivePattern();
+    });
+
+    guideToggleBtn.addEventListener('click', () => {
+      isGuideOpen = !isGuideOpen;
+      guidePanel.classList.toggle('hud-hidden', !isGuideOpen);
+    });
+
+    closeGuideBtn.addEventListener('click', () => {
+      isGuideOpen = false;
+      guidePanel.classList.add('hud-hidden');
+    });
+
+    hideHudBtn.addEventListener('click', toggleHud);
+    unhideHudNotice.addEventListener('click', toggleHud);
+    fullscreenBtn.addEventListener('click', toggleFullscreen);
+
+    // Keyboard Hotkeys
+    window.addEventListener('keydown', (e) => {
+      switch (e.key) {
+        case 'ArrowRight':
+        case 'PageDown':
+          switchPattern(currentPatternIndex + 1);
+          break;
+        case 'ArrowLeft':
+        case 'PageUp':
+          switchPattern(currentPatternIndex - 1);
+          break;
+        case 'f':
+        case 'F':
+          toggleFullscreen();
+          break;
+        case 'h':
+        case 'H':
+          toggleHud();
+          break;
+        case 'g':
+        case 'G':
+          isGuideOpen = !isGuideOpen;
+          guidePanel.classList.toggle('hud-hidden', !isGuideOpen);
+          break;
+        case 'r':
+        case 'R':
+          setRgbRange(currentRgbRange === 'full' ? 'limited' : 'full');
+          break;
+        case 'b':
+        case 'B':
+          togglePulse();
+          break;
+        case ' ':
+          e.preventDefault();
+          const p = PATTERNS[currentPatternIndex];
+          p.submodeIndex = (p.submodeIndex + 1) % p.submodes.length;
+          submodeBtnLabel.textContent = p.submodes[p.submodeIndex];
+          renderActivePattern();
+          break;
+      }
+    });
+
+    document.addEventListener('fullscreenchange', () => {
+      if (document.fullscreenElement) {
+        fsIcon.className = 'ph-bold ph-arrows-in-simple';
+        fsText.textContent = 'Exit FS';
+      } else {
+        fsIcon.className = 'ph-bold ph-arrows-out-simple';
+        fsText.textContent = 'Fullscreen';
+      }
+      setTimeout(resizeCanvas, 150);
+    });
+
+    window.addEventListener('resize', resizeCanvas);
+
+    window.onload = function() {
+      initTabs();
+      setRgbRange('full');
+      resizeCanvas();
+    };
+  </script>
+</body>
+</html>
