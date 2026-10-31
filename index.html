@@ -292,7 +292,7 @@
       background: #0f172a;
       border: 2px solid #38bdf8;
       border-radius: 20px;
-      width: 760px;
+      width: 780px;
       max-width: 90%;
       padding: 28px;
       box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9);
@@ -340,7 +340,7 @@
       pointer-events: none;
     }
 
-    /* Pattern 7: Black Level (Brightness) */
+    /* Stepped grid pages */
     .pattern-grid-page {
       width: 100%;
       height: 100%;
@@ -388,7 +388,6 @@
       border: 1px solid #000000;
     }
     
-    
     .step-card-num {
       font-family: monospace;
       font-size: 15px;
@@ -419,7 +418,65 @@
       color: #94a3b8;
     }
 
-    /* Pattern 9: Gamma & Grayscale Tracking */
+    /* Backlight Calibration Styles */
+    .backlight-target-row {
+      display: flex;
+      justify-content: center;
+      gap: 36px;
+      margin: 24px 0;
+    }
+
+    .backlight-card {
+      width: 380px;
+      background: #111827;
+      border: 1px solid #1f2937;
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .backlight-window-preview {
+      width: 180px;
+      height: 110px;
+      background: #000;
+      border: 1px solid #374151;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .backlight-apl-toggle-bar {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-top: 10px;
+    }
+
+    .apl-btn {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #cbd5e1;
+      padding: 8px 18px;
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .apl-btn:hover, .apl-btn.active {
+      background: #2563eb;
+      color: #ffffff;
+      border-color: #60a5fa;
+      box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
+    }
+
+    /* Grayscale Tracking */
     .grayscale-wedges {
       display: flex;
       width: 100%;
@@ -489,7 +546,7 @@
       color: #fff;
     }
 
-    /* Pattern 10: SMPTE Color Bars */
+    /* SMPTE Color Bars */
     .smpte-container {
       width: 100%;
       height: 100%;
@@ -538,7 +595,7 @@
       position: relative;
     }
 
-    /* Pattern 11: Sharpness & 1080p Overscan */
+    /* Sharpness & 1080p Overscan */
     .sharpness-container {
       width: 1920px;
       height: 1080px;
@@ -572,21 +629,20 @@
     }
     .overscan-100 {
       inset: 0;
-      border: 4px solid #ef4444; /* Outer edge: Must be visible for 1:1 pixel match */
+      border: 4px solid #ef4444;
       color: #ef4444;
     }
     .overscan-95 {
-      inset: 27px 48px; /* 2.5% */
+      inset: 27px 48px;
       border: 2px solid #eab308;
       color: #eab308;
     }
     .overscan-90 {
-      inset: 54px 96px; /* 5% */
+      inset: 54px 96px;
       border: 2px solid #22c55e;
       color: #22c55e;
     }
 
-    /* Crosshair & Circles in Sharpness */
     .center-crosshair {
       position: absolute;
       top: 50%;
@@ -617,7 +673,6 @@
       border-radius: 50%;
     }
 
-    /* 1-Pixel Alternating Sharpness Grid Targets */
     .fine-lines-box {
       width: 160px;
       height: 160px;
@@ -632,7 +687,7 @@
       background: repeating-linear-gradient(to right, #000 0px, #000 1px, #fff 1px, #fff 2px);
     }
 
-    /* Pattern 12: Motion Cadence & Judder Test */
+    /* Motion Test */
     .motion-container {
       width: 100%;
       height: 100%;
@@ -714,7 +769,53 @@
         </div>
       </section>
 
-      <!-- 7. Black Level (Brightness / Near-Black Clipping) -->
+      <!-- 7. Backlight & Peak Luminance Calibration (NEW) -->
+      <section id="p-backlight" class="pattern-pane" style="background: #000000;">
+        <div class="pattern-grid-page">
+          <div class="cal-title-block">
+            <h2 style="color: #f59e0b;">Backlight & Peak Luminance (Nits / Ambient Match)</h2>
+            <p>Backlight sets physical lamp/OLED emitter intensity without clipping signal values. Use APL windows to prevent TV local dimming/ABL fluctuations. Adjust your physical TV <strong>Backlight</strong> or <strong>OLED Pixel Brightness</strong> to match ambient lighting.</p>
+          </div>
+
+          <!-- Dynamic Centered APL Window Stage -->
+          <div style="display:flex; justify-content:center; align-items:center; height:340px;">
+            <div id="apl-window" style="width: 607px; height: 341px; background: #ffffff; display: flex; flex-direction:column; align-items: center; justify-content: center; border-radius: 8px; box-shadow: 0 0 50px rgba(255,255,255,0.2); transition: all 0.3s ease;">
+              <span id="apl-percent-label" style="font-family: monospace; font-size: 26px; font-weight: 800; color: #000;">10% APL Window</span>
+              <span style="font-size: 13px; color: #444; font-family: monospace; margin-top: 4px;">Industry Reference Luminance Target (RGB 255)</span>
+            </div>
+          </div>
+
+          <!-- Target Guidelines & Presets -->
+          <div class="backlight-target-row">
+            <div class="backlight-card">
+              <span style="color:#38bdf8; font-weight:700; font-size:16px;">Standard Dark Room Target</span>
+              <div style="font-family:monospace; font-size:22px; font-weight:800; color:#fff;">100 - 120 cd/m² (Nits)</div>
+              <p style="font-size:12px; color:#94a3b8; text-align:center; line-height:1.4;">
+                Set Backlight to <strong>25% - 40%</strong>. Ensures fatigue-free viewing, deep contrast, and protects against eye-strain in dim rooms.
+              </p>
+            </div>
+
+            <div class="backlight-card">
+              <span style="color:#f59e0b; font-weight:700; font-size:16px;">Daylight / Bright Room Target</span>
+              <div style="font-family:monospace; font-size:22px; font-weight:800; color:#fff;">200 - 300+ cd/m² (Nits)</div>
+              <p style="font-size:12px; color:#94a3b8; text-align:center; line-height:1.4;">
+                Increase Backlight to <strong>70% - 100%</strong> to overcome daylight reflections and ambient glare without altering signal contrast.
+              </p>
+            </div>
+          </div>
+
+          <!-- Interactive APL & Test Controls -->
+          <div class="backlight-apl-toggle-bar">
+            <span style="align-self:center; font-size:12px; color:#94a3b8; font-family:monospace; margin-right:10px;">Select Test Patch:</span>
+            <button class="apl-btn active" data-apl="10">10% Window</button>
+            <button class="apl-btn" data-apl="25">25% Window</button>
+            <button class="apl-btn" data-apl="50">50% Window</button>
+            <button class="apl-btn" data-apl="100">100% Full Screen</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 8. Black Level (Brightness / Near-Black Clipping) -->
       <section id="p-blacklevel" class="pattern-pane" style="background: #000000;">
         <div class="pattern-grid-page">
           <div class="cal-title-block">
@@ -723,9 +824,7 @@
           </div>
 
           <!-- Stepped low-IRE Boxes -->
-          <div class="stepped-box-row" id="black-steps-row">
-            <!-- Dynamically populated via JS for exact RGB precision -->
-          </div>
+          <div class="stepped-box-row" id="black-steps-row"></div>
 
           <!-- Low end continuous ramp -->
           <div class="gradient-bar-wrap">
@@ -741,7 +840,7 @@
         </div>
       </section>
 
-      <!-- 8. White Level (Contrast / Highlight Clipping) -->
+      <!-- 9. White Level (Contrast / Highlight Clipping) -->
       <section id="p-whitelevel" class="pattern-pane" style="background: #ffffff; color: #111;">
         <div class="pattern-grid-page">
           <div class="cal-title-block">
@@ -750,9 +849,7 @@
           </div>
 
           <!-- Stepped high-IRE Boxes -->
-          <div class="stepped-box-row" id="white-steps-row">
-            <!-- Dynamically populated -->
-          </div>
+          <div class="stepped-box-row" id="white-steps-row"></div>
 
           <!-- High end continuous ramp -->
           <div class="gradient-bar-wrap">
@@ -768,7 +865,7 @@
         </div>
       </section>
 
-      <!-- 9. Grayscale Wedges & Gamma Test -->
+      <!-- 10. Grayscale Wedges & Gamma Test -->
       <section id="p-grayscale" class="pattern-pane" style="background: #11141a;">
         <div class="pattern-grid-page">
           <div class="cal-title-block">
@@ -777,22 +874,18 @@
           </div>
 
           <!-- 16-Step Grayscale Wedge -->
-          <div class="grayscale-wedges" id="wedge-container">
-            <!-- Generated via JS -->
-          </div>
+          <div class="grayscale-wedges" id="wedge-container"></div>
 
           <!-- Visual Gamma Match Squares -->
           <div class="gamma-grid-wrapper">
             <div class="gamma-box">
               <div class="gamma-lines-bg"></div>
-              <!-- 50% line density approximates Gamma 2.2 at RGB 186 -->
               <div class="gamma-solid-inner" style="background: rgb(186, 186, 186);"></div>
               <div class="gamma-label">Gamma 2.2 Target</div>
             </div>
 
             <div class="gamma-box">
               <div class="gamma-lines-bg"></div>
-              <!-- Approximates Gamma 2.4 at RGB 178 -->
               <div class="gamma-solid-inner" style="background: rgb(178, 178, 178);"></div>
               <div class="gamma-label">Gamma 2.4 Target</div>
             </div>
@@ -802,10 +895,9 @@
         </div>
       </section>
 
-      <!-- 10. Industry Standard SMPTE Color Bars -->
+      <!-- 11. Industry Standard SMPTE Color Bars -->
       <section id="p-smpte" class="pattern-pane">
         <div class="smpte-container">
-          <!-- 75% Top Color Bars -->
           <div class="smpte-bars-top">
             <div class="smpte-bar" style="background:#c0c0c0; color:#000;"><span>75% Gray</span><span>192,192,192</span></div>
             <div class="smpte-bar" style="background:#c0c000; color:#000;"><span>Yellow</span><span>192,192,0</span></div>
@@ -815,7 +907,6 @@
             <div class="smpte-bar" style="background:#c00000; color:#fff;"><span>Red</span><span>192,0,0</span></div>
             <div class="smpte-bar" style="background:#0000c0; color:#fff;"><span>Blue</span><span>0,0,192</span></div>
           </div>
-          <!-- Middle Mini Bars -->
           <div class="smpte-bars-mid">
             <div class="smpte-mid-block" style="background:#0000c0;"></div>
             <div class="smpte-mid-block" style="background:#131313;"></div>
@@ -825,13 +916,11 @@
             <div class="smpte-mid-block" style="background:#131313;"></div>
             <div class="smpte-mid-block" style="background:#c0c0c0;"></div>
           </div>
-          <!-- Bottom Pluge & Saturation Ramps -->
           <div class="smpte-bars-pluge">
             <div class="pluge-segment" style="width:18%; background:#00214c; color:#fff;">-I Carrier</div>
             <div class="pluge-segment" style="width:18%; background:#ffffff; color:#000;">100% White</div>
             <div class="pluge-segment" style="width:18%; background:#32006a; color:#fff;">+Q Carrier</div>
             <div class="pluge-segment" style="width:14%; background:#000000; color:#666;">Black (0 IRE)</div>
-            <!-- PLUGE: -2%, 0%, +2% -->
             <div class="pluge-segment" style="width:16%; background:#000; display:flex; padding:0 10px; gap:6px;">
               <div style="flex:1; height:100%; background:rgb(10,10,10); display:flex; align-items:center; justify-content:center; font-size:10px; color:#555;">-2%</div>
               <div style="flex:1; height:100%; background:rgb(16,16,16); display:flex; align-items:center; justify-content:center; font-size:10px; color:#777;">0% (16)</div>
@@ -842,21 +931,16 @@
         </div>
       </section>
 
-      <!-- 11. Sharpness & 1080p 1:1 Pixel Mapping (Overscan) -->
+      <!-- 12. Sharpness & 1080p 1:1 Pixel Mapping (Overscan) -->
       <section id="p-sharpness" class="pattern-pane">
         <div class="sharpness-container">
           <div class="pixel-checker-bg"></div>
-
-          <!-- Center Focus Dial -->
           <div class="center-crosshair"></div>
-
-          <!-- 4 Corner Single-Pixel Frequency Blocks -->
           <div class="fine-lines-box lines-h" style="top: 80px; left: 120px;"></div>
           <div class="fine-lines-box lines-v" style="top: 80px; right: 120px;"></div>
           <div class="fine-lines-box lines-v" style="bottom: 80px; left: 120px;"></div>
           <div class="fine-lines-box lines-h" style="bottom: 80px; right: 120px;"></div>
 
-          <!-- Overscan Guide Frames -->
           <div class="overscan-frame overscan-100">
             <span>0% OVERSCAN (1920x1080 FHD BORDER - Red Line MUST be fully visible)</span>
           </div>
@@ -875,7 +959,7 @@
         </div>
       </section>
 
-      <!-- 12. Motion Judder & Frame Cadence -->
+      <!-- 13. Motion Judder & Frame Cadence -->
       <section id="p-motion" class="pattern-pane">
         <div class="motion-container">
           <div style="text-align:center;">
@@ -907,7 +991,7 @@
   <aside id="tv-hud">
     <div class="hud-header">
       <div class="hud-title-box">
-        <span class="pattern-index-badge" id="hud-badge">TEST 1/12</span>
+        <span class="pattern-index-badge" id="hud-badge">TEST 1/13</span>
         <span class="pattern-title" id="hud-name">Pure Black</span>
         <span class="pattern-goal" id="hud-goal">OLED true black & backlight uniformity</span>
       </div>
@@ -918,15 +1002,13 @@
     </div>
 
     <!-- Scrollable Tab Carousel with D-Pad Nav -->
-    <div class="tab-carousel" id="tab-carousel">
-      <!-- Buttons dynamically injected and managed via index -->
-    </div>
+    <div class="tab-carousel" id="tab-carousel"></div>
 
     <div class="hud-footer">
       <div class="remote-hints">
         <span class="remote-pill"><span class="key-badge">◀ ▶</span> Prev/Next</span>
         <span class="remote-pill"><span class="key-badge">OK / Enter</span> Toggle Menu</span>
-        <span class="remote-pill"><span class="key-badge">0-9</span> Direct Pattern</span>
+        <span class="remote-pill"><span class="key-badge">B</span> Backlight Test</span>
         <span class="remote-pill"><span class="key-badge">Info / M</span> TV Remote Guide</span>
       </div>
       <div>
@@ -941,7 +1023,7 @@
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <h3 style="font-size:20px; font-weight:800; color:#38bdf8; display:flex; align-items:center; gap:8px;">
           <svg width="22" height="22" fill="currentColor" viewBox="0 0 24 24"><path d="M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm0 2v16h10V4H7zm5 11a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm-2-8h4v2h-4V7zm0 3h4v2h-4v-2z"/></svg>
-          Smart TV Remote Cheat-Sheet
+          Smart TV Calibration & Remote Guide
         </h3>
         <button id="close-modal-btn" class="tv-btn" style="padding:6px 12px;">Close (Back / OK)</button>
       </div>
@@ -950,19 +1032,19 @@
 
       <div class="info-grid">
         <div class="info-item"><span>Left / Right D-Pad</span><span class="key-badge">Switch Pattern</span></div>
-        <div class="info-item"><span>OK / Select</span><span class="key-badge">Focus / Select Tab</span></div>
+        <div class="info-item"><span>OK / Select</span><span class="key-badge">Select / Toggle</span></div>
         <div class="info-item"><span>Up / Down D-Pad</span><span class="key-badge">Wake / Toggle HUD</span></div>
-        <div class="info-item"><span>Back / Return / Exit</span><span class="key-badge">Dismiss Overlays</span></div>
-        <div class="info-item"><span>Number Keys (0 - 9)</span><span class="key-badge">Jump Directly</span></div>
+        <div class="info-item"><span>B Key</span><span class="key-badge">Jump to Backlight</span></div>
+        <div class="info-item"><span>1 - 4 (on Backlight page)</span><span class="key-badge">Change APL Window</span></div>
         <div class="info-item"><span>F or Blue Remote Key</span><span class="key-badge">Full Screen</span></div>
       </div>
 
       <div style="background:rgba(37,99,235,0.15); border:1px solid #38bdf8; padding:12px; border-radius:10px; font-size:12px; color:#e0f2fe;">
         <strong>Recommended Calibration Sequence:</strong><br>
-        1. <strong>Sharpness & Overscan</strong> (Ensure 1:1 Pixel Match with no cropped edges).<br>
-        2. <strong>Black Level</strong> (Adjust Brightness so RGB 16 is barely visible).<br>
-        3. <strong>White Level</strong> (Adjust Contrast so RGB 250 remains visible).<br>
-        4. <strong>SMPTE Color Bars</strong> (Adjust Color / Saturation to avoid color clipping).
+        1. <strong>Backlight</strong>: Set physical Backlight/OLED Brightness to room ambient comfort (100–120 nits dark, 200+ nits bright).<br>
+        2. <strong>Sharpness & Overscan</strong>: Ensure 1:1 Pixel Match (Just Scan / Screen Fit) with zero edge haloing.<br>
+        3. <strong>Black Level (Brightness)</strong>: Adjust so RGB 16 is barely visible while 1–4 are true black.<br>
+        4. <strong>White Level (Contrast)</strong>: Adjust so boxes up to RGB 250 remain visible without clipping.
       </div>
     </div>
   </div>
@@ -980,6 +1062,7 @@
       { id: 'p-green', name: 'Pure Green', goal: 'Verify primary Green subpixel purity and panel color balance.', key: '4' },
       { id: 'p-blue', name: 'Pure Blue', goal: 'Verify primary Blue subpixel purity and uniform rendition.', key: '5' },
       { id: 'p-cmy', name: 'Cyan / Magenta / Yellow', goal: 'Secondary color subpixel cross-talk and purity.', key: '6' },
+      { id: 'p-backlight', name: 'Backlight & Peak Nits', goal: 'Configure physical TV Backlight / OLED Brightness for room lighting.', key: 'B' },
       { id: 'p-blacklevel', name: 'Black Level (Brightness)', goal: 'Adjust TV Brightness so RGB 16 is faint, and lower steps melt into black.', key: '7' },
       { id: 'p-whitelevel', name: 'White Level (Contrast)', goal: 'Adjust TV Contrast so bright steps up to 252/254 remain clearly visible.', key: '8' },
       { id: 'p-grayscale', name: 'Grayscale & Gamma', goal: 'Verify neutral color tracking across all IRE steps and check 2.2/2.4 gamma.', key: '9' },
@@ -1008,19 +1091,62 @@
     const fpsDisplay = document.getElementById('fps-display');
     const fpsCounter = document.getElementById('fps-counter');
 
+    const aplWindow = document.getElementById('apl-window');
+    const aplPercentLabel = document.getElementById('apl-percent-label');
+    const aplButtons = document.querySelectorAll('.apl-btn');
+
     /* ---------------- 1080p Stage Autoscaling ---------------- */
     function rescaleStage() {
       const windowWidth = window.innerWidth;
       const windowHeight = window.innerHeight;
       const scaleX = windowWidth / 1920;
       const scaleY = windowHeight / 1080;
-      // Fit proportionally
       const scale = Math.min(scaleX, scaleY);
       stage.style.transform = `scale(${scale})`;
       resBadge.textContent = `${windowWidth}×${windowHeight} (${(windowWidth/windowHeight).toFixed(2)}:1)`;
     }
 
     window.addEventListener('resize', rescaleStage);
+
+    /* ---------------- APL Window Switcher for Backlight ---------------- */
+    function setAPLWindow(percent) {
+      aplButtons.forEach(btn => {
+        if (parseInt(btn.getAttribute('data-apl'), 10) === percent) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+
+      // Window dimensions proportionally calculated for 16:9 FHD canvas
+      if (percent === 10) {
+        aplWindow.style.width = '607px';
+        aplWindow.style.height = '341px';
+        aplPercentLabel.textContent = '10% APL Window';
+      } else if (percent === 25) {
+        aplWindow.style.width = '960px';
+        aplWindow.style.height = '540px';
+        aplPercentLabel.textContent = '25% APL Window';
+      } else if (percent === 50) {
+        aplWindow.style.width = '1357px';
+        aplWindow.style.height = '763px';
+        aplPercentLabel.textContent = '50% APL Window';
+      } else if (percent === 100) {
+        aplWindow.style.width = '1920px';
+        aplWindow.style.height = '1080px';
+        aplPercentLabel.textContent = '100% Full Screen Window';
+      }
+
+      showToast(`APL Window: ${percent}%`);
+    }
+
+    aplButtons.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const apl = parseInt(btn.getAttribute('data-apl'), 10);
+        setAPLWindow(apl);
+      });
+    });
 
     /* ---------------- Generate Stepped Grids ---------------- */
     function initPatterns() {
@@ -1189,14 +1315,12 @@
     closeModalBtn.addEventListener('click', toggleModal);
 
     /* ---------------- Comprehensive Smart TV Remote Keymap ---------------- */
-    // Supports Standard Keyboards, Tizen (461, 10009), webOS (461, 8), Android TV D-Pad & FireTV
     window.addEventListener('keydown', (e) => {
       wakeHUD();
 
       const keyCode = e.keyCode || e.which;
       const key = e.key;
 
-      // Handle Modal Exit
       if (isModalOpen) {
         if (keyCode === 27 || keyCode === 8 || keyCode === 461 || keyCode === 10009 || key === 'Escape' || key === 'Backspace' || keyCode === 13) {
           e.preventDefault();
@@ -1205,53 +1329,58 @@
         }
       }
 
+      // Quick APL shortcuts if on the Backlight Pattern (Index 6)
+      if (currentIndex === 6) {
+        if (key === '1') { setAPLWindow(10); return; }
+        if (key === '2') { setAPLWindow(25); return; }
+        if (key === '3') { setAPLWindow(50); return; }
+        if (key === '4') { setAPLWindow(100); return; }
+      }
+
       switch (keyCode) {
-        // D-Pad Left / Channel Down / Left Arrow / Media Prev
-        case 37: // Left Arrow
-        case 428: // Channel Down
-        case 412: // Media Rewind
+        // D-Pad Left / Channel Down / Media Prev
+        case 37:
+        case 428:
+        case 412:
           e.preventDefault();
           setPattern(currentIndex - 1);
           break;
 
-        // D-Pad Right / Channel Up / Right Arrow / Media Next
-        case 39: // Right Arrow
-        case 427: // Channel Up
-        case 417: // Media FastForward
+        // D-Pad Right / Channel Up / Media Next
+        case 39:
+        case 427:
+        case 417:
           e.preventDefault();
           setPattern(currentIndex + 1);
           break;
 
         // D-Pad Up
-        case 38: // Up Arrow
+        case 38:
           e.preventDefault();
           wakeHUD();
-          // Focus current button in tab carousel for D-Pad navigation
           const activeBtn = document.getElementById(`btn-tab-${currentIndex}`);
           if (activeBtn) activeBtn.focus();
           break;
 
         // D-Pad Down
-        case 40: // Down Arrow
+        case 40:
           e.preventDefault();
           toggleHUD();
           break;
 
-        // Enter / OK / Select
-        case 13: // Enter / OK Key
-          if (document.activeElement && document.activeElement.classList.contains('tv-btn')) {
-            // Already handled by native click
-          } else {
+        // Enter / OK
+        case 13:
+          if (!document.activeElement || !document.activeElement.classList.contains('tv-btn')) {
             toggleHUD();
           }
           break;
 
         // Return / Back / Exit
-        case 27:   // Escape
-        case 8:    // Backspace
-        case 461:  // LG webOS / Tizen Return
-        case 10009:// Samsung Tizen Back
-        case 10182:// Android TV Back
+        case 27:
+        case 8:
+        case 461:
+        case 10009:
+        case 10182:
           e.preventDefault();
           if (isModalOpen) {
             toggleModal();
@@ -1262,41 +1391,48 @@
           }
           break;
 
+        // Backlight Direct Key ('b' or 'B')
+        case 66:
+        case 98:
+          e.preventDefault();
+          setPattern(6);
+          break;
+
         // Info / Menu keys
-        case 457: // Samsung Info
-        case 462: // Menu key
-        case 73:  // 'i'
-        case 105: // 'I'
-        case 77:  // 'm'
-        case 109: // 'M'
+        case 457:
+        case 462:
+        case 73:
+        case 105:
+        case 77:
+        case 109:
           e.preventDefault();
           toggleModal();
           break;
 
         // Fullscreen Toggle
-        case 70: // 'f'
-        case 102:// 'F'
-        case 403:// Red color key
+        case 70:
+        case 102:
+        case 403:
           e.preventDefault();
           toggleFullscreen();
           break;
 
-        // Number Keys (0 - 9 Direct Selection)
+        // Number Keys (0 - 9)
         case 49: setPattern(0); break; // 1 -> Black
         case 50: setPattern(1); break; // 2 -> White
         case 51: setPattern(2); break; // 3 -> Red
         case 52: setPattern(3); break; // 4 -> Green
         case 53: setPattern(4); break; // 5 -> Blue
         case 54: setPattern(5); break; // 6 -> CMY
-        case 55: setPattern(6); break; // 7 -> Black Level
-        case 56: setPattern(7); break; // 8 -> White Level
-        case 57: setPattern(8); break; // 9 -> Grayscale
-        case 48: setPattern(9); break; // 0 -> SMPTE Bars
-        case 83: setPattern(10); break; // S -> Sharpness
+        case 55: setPattern(7); break; // 7 -> Black Level
+        case 56: setPattern(8); break; // 8 -> White Level
+        case 57: setPattern(9); break; // 9 -> Grayscale
+        case 48: setPattern(10); break; // 0 -> SMPTE Bars
+        case 83: setPattern(11); break; // S -> Sharpness
+        case 77: setPattern(12); break; // M -> Motion
       }
     });
 
-    // Mouse movement / Touch awakens HUD
     window.addEventListener('mousemove', wakeHUD);
     window.addEventListener('touchstart', wakeHUD, { passive: true });
 
@@ -1314,7 +1450,6 @@
       const dt = (now - lastTime) / 1000;
       lastTime = now;
 
-      // Track FPS
       frameCount++;
       if (now - lastFpsUpdate >= 1000) {
         const fps = Math.round((frameCount * 1000) / (now - lastFpsUpdate));
@@ -1324,11 +1459,9 @@
         lastFpsUpdate = now;
       }
 
-      // Update only when motion pattern is active to conserve TV CPU cycles
-      if (currentIndex === 11) {
+      // Update only when motion pattern (index 12) is active
+      if (currentIndex === 12) {
         const maxWidth = 1920 - 140;
-
-        // 3 different simulated cadence speeds
         m1X = (m1X + 320 * dt) % maxWidth;
         m2X = (m2X + 600 * dt) % maxWidth;
         m3X = (m3X + 960 * dt) % maxWidth;
@@ -1341,7 +1474,7 @@
       requestAnimationFrame(motionLoop);
     }
 
-    /* ---------------- Initialize Engine on Window Load ---------------- */
+    /* ---------------- Initialize Engine ---------------- */
     window.onload = function () {
       initPatterns();
       renderTabs();
